@@ -66,20 +66,31 @@ $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION xpath_element_text(document xml, element text, namespaces text[])
   RETURNS text AS $$
-  DECLARE x xml[]; t text;
+  DECLARE x xml[]; t text; c text; v text[] := '{}';
   BEGIN
     SELECT xpath('//' || element || '//text()', document, namespaces) INTO x;
     IF cardinality(x) = 1 THEN
-      RETURN x[1];
+      c := trim(regexp_replace(x[1]::text, '\n', ''));
+      IF char_length(c) > 0 THEN
+        RETURN c;
+      ELSE
+        RETURN NULL;
+      END IF;
     ELSIF cardinality(x) = 0 THEN
-      RETURN null;
-    ELSE -- return the first text
+      RETURN NULL;
+    ELSE -- return the first text or NULL
       FOREACH t IN ARRAY x
       LOOP
-        IF char_length(trim(t)) > 0 THEN
-          RETURN t;
+        c := trim(regexp_replace(t, '\n', ''));
+        IF char_length(c) > 0 THEN
+          v := v || c;
         END IF;
       END LOOP;
+      IF cardinality(v) > 0 THEN
+        RETURN array_to_string(v, ', ');
+      ELSE
+        RETURN NULL;
+      END IF;
     END IF;
   END;
 $$ LANGUAGE plpgsql;
